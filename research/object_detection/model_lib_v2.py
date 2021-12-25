@@ -630,7 +630,7 @@ def train_loop(
             tf.compat.v2.summary.image(
                 name='train_input_images',
                 step=global_step,
-                data=features[fields.InputDataFields.image],
+                data=(features[fields.InputDataFields.image]  + 1) / 2,
                 max_outputs=3)
           losses_dict = eager_train_step(
               detection_model,

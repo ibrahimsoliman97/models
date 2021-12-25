@@ -61,9 +61,10 @@ def image_to_byte_array(image:PIL.Image):
 def dict_to_tf_example(image_path,
                        annotations_xml,
                        label_map_dict,
-                       ignore_regions_xml=[]):
+                       ignore_regions_xml=[],
+                       video_name=""):
 
-    image_name = os.path.basename(image_path)
+    image_name = video_name + '_' +  os.path.basename(image_path)
     image = PIL.Image.open(image_path)
     if image.format != 'JPEG':
         raise ValueError('Image format not JPEG')
@@ -150,7 +151,7 @@ def main(_):
                 target_list = xml.find(f".//*[@num='{frame_no}']")
                 annotations = target_list[0] if target_list else []
                 tf_example = dict_to_tf_example(
-                    image_path, annotations, label_map_dict, ignored_region)
+                    image_path, annotations, label_map_dict, ignored_region, directory)
                 writer.write(tf_example.SerializeToString())
     writer.close()
 
