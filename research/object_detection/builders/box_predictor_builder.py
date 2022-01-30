@@ -30,6 +30,7 @@ from object_detection.predictors.heads import keras_class_head
 from object_detection.predictors.heads import keras_mask_head
 from object_detection.predictors.heads import mask_head
 from object_detection.protos import box_predictor_pb2
+from object_detection.predictors.heads import keras_embedding_head
 
 
 def build_convolutional_box_predictor(is_training,
@@ -127,6 +128,7 @@ def build_convolutional_keras_box_predictor(is_training,
                                             dropout_keep_prob,
                                             kernel_size,
                                             box_code_size,
+                                            embedding_size = 0,
                                             add_background_class=True,
                                             class_prediction_bias_init=0.0,
                                             use_depthwise=False,
@@ -185,9 +187,23 @@ def build_convolutional_keras_box_predictor(is_training,
   box_prediction_heads = []
   class_prediction_heads = []
   other_heads = {}
-
+  if embedding_size:
+    other_heads = {"embedding":[]}
+  print(num_predictions_per_location_list)
+  
+  
   for stack_index, num_predictions_per_location in enumerate(
       num_predictions_per_location_list):
+    if embedding_size:
+      other_heads["embedding"].append(keras_embedding_head.ConvolutionalEmbeddingHead(
+        is_training=is_training,
+        embedding_size=embedding_size,
+        kernel_size=kernel_size,
+        use_depthwise=use_depthwise,
+        conv_hyperparams=conv_hyperparams,
+        freeze_batchnorm=freeze_batchnorm,
+        num_predictions_per_location=num_predictions_per_location,name='ConvolutionalEmbeddingHead_%d' % stack_index)
+      )
     box_prediction_heads.append(
         keras_box_head.ConvolutionalBoxHead(
             is_training=is_training,
@@ -878,6 +894,7 @@ def build_keras(hyperparams_fn, freeze_batchnorm, inplace_batchnorm_update,
         add_background_class=add_background_class,
         conv_hyperparams=conv_hyperparams,
         freeze_batchnorm=freeze_batchnorm,
+        embedding_size=config_box_predictor.embedding_size,
         inplace_batchnorm_update=inplace_batchnorm_update,
         num_predictions_per_location_list=num_predictions_per_location_list,
         use_dropout=config_box_predictor.use_dropout,

@@ -321,6 +321,7 @@ class DetectionModel(six.with_metaclass(abc.ABCMeta, _BaseClass)):
       groundtruth_is_crowd_list=None,
       groundtruth_group_of_list=None,
       groundtruth_area_list=None,
+      groundtruth_re_id=None,
       is_annotated_list=None,
       groundtruth_labeled_classes=None,
       groundtruth_verified_neg_classes=None,
@@ -489,6 +490,10 @@ class DetectionModel(six.with_metaclass(abc.ABCMeta, _BaseClass)):
               groundtruth_not_exhaustive_classes)
     if training_step is not None:
       self._training_step = training_step
+    
+    if groundtruth_re_id:
+      self._groundtruth_lists[
+          fields.BoxListFields.re_id] = groundtruth_re_id
 
   @abc.abstractmethod
   def regularization_losses(self):

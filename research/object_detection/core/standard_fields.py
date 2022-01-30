@@ -138,6 +138,7 @@ class InputDataFields(object):
   groundtruth_dp_num_points = 'groundtruth_dp_num_points'
   groundtruth_dp_part_ids = 'groundtruth_dp_part_ids'
   groundtruth_dp_surface_coords = 'groundtruth_dp_surface_coords'
+  groundtruth_re_id = 'groundtruth_re_id'
   num_groundtruth_boxes = 'num_groundtruth_boxes'
   is_annotated = 'is_annotated'
   true_image_shape = 'true_image_shape'
@@ -198,6 +199,8 @@ class DetectionResultFields(object):
   raw_detection_boxes = 'raw_detection_boxes'
   raw_detection_scores = 'raw_detection_scores'
   detection_anchor_indices = 'detection_anchor_indices'
+  raw_embedding = 'raw_embedding'
+  embedding = 'nms_embedding'
 
 
 class BoxListFields(object):
@@ -246,7 +249,7 @@ class BoxListFields(object):
   track_ids = 'track_ids'
   temporal_offsets = 'temporal_offsets'
   track_match_flags = 'track_match_flags'
-
+  re_id = 're_id'
 
 class PredictionFields(object):
   """Naming conventions for standardized prediction outputs.
@@ -343,7 +346,7 @@ class TfExampleFields(object):
   detection_bbox_ymax = 'image/detection/bbox/ymax'
   detection_bbox_xmax = 'image/detection/bbox/xmax'
   detection_score = 'image/detection/score'
-
+  object_re_id = 'image/object/re_id'
 # Sequence fields for SequenceExample inputs.
 # All others are considered context fields.
 SEQUENCE_FIELDS = [InputDataFields.image,
