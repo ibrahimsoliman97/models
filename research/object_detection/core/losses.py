@@ -1098,7 +1098,7 @@ class EmbeddingLoss(Loss):
         tf.reshape(sq_sum_a, (-1, 1)) + tf.reshape(sq_sum_b, (1, -1))
 
 
-  def softmargin_triplet_loss(self, batch):
+  def softmargin_triplet_loss(self, features, labels):
     """Softmargin triplet loss.
     See::
         Hermans, Beyer, Leibe: In Defense of the Triplet Loss for Person
@@ -1118,31 +1118,82 @@ class EmbeddingLoss(Loss):
     tf.Tensor
         A scalar loss tensor.
     """
-    create_summaries = True
-    single_batch_pred, single_batch_gt = batch[0], batch[1]
-    #single_batch_pred = tf.tile(single_batch_pred, [2,1])
-    #single_batch_gt = tf.tile(single_batch_gt, [2])
-    zero_ = tf.constant(0, dtype=tf.float32)
-    mask = tf.not_equal(single_batch_gt, zero_)
-    new_label = tf.boolean_mask(single_batch_gt, mask)
-    new_emb = tf.boolean_mask(single_batch_pred, mask)
-
     eps = tf.constant(1e-5, tf.float32)
     nil = tf.constant(0., tf.float32)
     almost_inf = tf.constant(1e+10, tf.float32)
 
-    squared_distance_mat = self._pdist(new_emb)
+    squared_distance_mat = self._pdist(features)
     distance_mat = tf.sqrt(tf.maximum(nil, eps + squared_distance_mat))
     label_mat = tf.cast(tf.equal(
-        tf.reshape(new_label, (-1, 1)), tf.reshape(new_label, (1, -1))), tf.float32)
+        tf.reshape(labels, (-1, 1)), tf.reshape(labels, (1, -1))), tf.float32)
 
     positive_distance = tf.reduce_max(label_mat * distance_mat, axis=1)
     negative_distance = tf.reduce_min(
         (label_mat * almost_inf) + distance_mat, axis=1)
     loss = tf.nn.softplus(positive_distance - negative_distance)
+    return tf.reduce_mean(loss)
 
+  def magnet_loss(self, features, labels, margin=0.7, unique_labels=None):
+    """Simple unimodal magnet loss.
+    See::
+        Rippel, Paluri, Dollar, Bourdev: Metric Learning With Adaptive
+        Density Discrimination. ICLR, 2016.
+    Parameters
+    ----------
+    features : tf.Tensor
+        A matrix of shape NxM that contains the M-dimensional feature vectors
+        of N objects (floating type).
+    labels : tf.Tensor
+        The one-dimensional array of length N that contains for each feature
+        the associated class label (integer type).
+    margin : float
+        A scalar margin hyperparameter.
+    unique_labels : Optional[tf.Tensor]
+        Optional tensor of unique values in `labels`. If None given, computed
+        from data.
+    Returns
+    -------
+    tf.Tensor
+        A scalar loss tensor.
+    """
+    nil = tf.constant(0., tf.float32)
+    one = tf.constant(1., tf.float32)
+    minus_two = tf.constant(-2., tf.float32)
+    eps = tf.constant(1e-4, tf.float32)
+    margin = tf.constant(margin, tf.float32)
 
-    return tf.reduce_mean(loss), 0
+    num_per_class = None
+    if unique_labels is None:
+        unique_labels, sample_to_unique_y, num_per_class = tf.unique_with_counts(labels)
+        num_per_class = tf.cast(num_per_class, tf.float32)
+
+    y_mat = tf.cast(tf.equal(
+        tf.reshape(labels, (-1, 1)), tf.reshape(unique_labels, (1, -1))),
+        dtype=tf.float32)
+
+    # If class_means is None, compute from batch data.
+    if num_per_class is None:
+        num_per_class = tf.reduce_sum(y_mat, reduction_indices=[0])
+    class_means = tf.reduce_sum(
+        tf.expand_dims(tf.transpose(y_mat), -1) * tf.expand_dims(features, 0),
+        reduction_indices=[1]) / tf.expand_dims(num_per_class, -1)
+
+    squared_distance = self._pdist(features, class_means)
+
+    num_samples = tf.cast(tf.shape(labels)[0], tf.float32)
+    variance = tf.reduce_sum(
+        y_mat * squared_distance) / (num_samples - one)
+
+    const = one / (minus_two * (variance + eps))
+    linear = const * squared_distance - y_mat * margin
+
+    maxi = tf.reduce_max(linear, reduction_indices=[1], keepdims=True)
+    loss_mat = tf.exp(linear - maxi)
+
+    a = tf.reduce_sum(y_mat * loss_mat, reduction_indices=[1])
+    b = tf.reduce_sum((one - y_mat) * loss_mat, reduction_indices=[1])
+    loss = tf.maximum(nil, -tf.log(eps + a / (eps + b)))
+    return tf.reduce_mean(loss) 
 
   def _compute_loss(self, prediction_tensor, target_tensor, weights):
     """Compute loss function.
@@ -1164,6 +1215,15 @@ class EmbeddingLoss(Loss):
     #target_tensor = tf.where(tf.is_nan(target_tensor),
      #                         tf.ones(tf.shape(target_tensor), tf.float32),
      #                         target_tensor)
-    final_output, _ = tf.map_fn(self.compute_loss_triple_all, (prediction_tensor, target_tensor), dtype=(tf.float32, tf.float32))       
-    #final_output = tf.reduce_mean(final_output)
-    return tf.reduce_mean(final_output)
+         #final_output, _ = tf.map_fn(self.softmargin_triplet_loss, (prediction_tensor, target_tensor), dtype=(tf.float32, tf.float32))       
+
+    # tf.print(prediction_tensor)
+    #tf.print(tf.shape(prediction_tensor))
+    prediction_tensor_flatten_batch = tf.reshape(prediction_tensor, [-1, 256])
+    target_tensor_flatten_batch = tf.reshape(target_tensor, [-1])
+    zero_ = tf.constant(0, dtype=tf.float32)
+    mask = tf.not_equal(target_tensor_flatten_batch, zero_)
+    target_tensor_flatten_batch = tf.boolean_mask(target_tensor_flatten_batch, mask)
+    prediction_tensor_flatten_batch = tf.boolean_mask(prediction_tensor_flatten_batch, mask)
+    final_loss = self.magnet_loss(prediction_tensor_flatten_batch, target_tensor_flatten_batch)
+    return tf.reduce_mean(final_loss)

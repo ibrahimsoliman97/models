@@ -136,6 +136,7 @@ message WeightSharedConvolutionalBoxPredictor {
     optional float max = 2;
   }
   optional BoxEncodingsClipRange box_encodings_clip_range = 17;
+   optional int32 embedding_size = 21 [default = 0];
 
 }
 

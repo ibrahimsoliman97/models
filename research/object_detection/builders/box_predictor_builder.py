@@ -337,6 +337,7 @@ def build_weight_shared_convolutional_keras_box_predictor(
     depth,
     num_layers_before_predictor,
     box_code_size,
+    embedding_size = 0,
     kernel_size=3,
     add_background_class=True,
     class_prediction_bias_init=0.0,
@@ -409,8 +410,12 @@ def build_weight_shared_convolutional_keras_box_predictor(
     raise ValueError('num predictions per location must be same for all'
                      'feature maps, found: {}'.format(
                          num_predictions_per_location_list))
+
+
+  print(num_predictions_per_location_list)
   num_predictions_per_location = num_predictions_per_location_list[0]
 
+ 
   box_prediction_head = keras_box_head.WeightSharedConvolutionalBoxHead(
       box_code_size=box_code_size,
       kernel_size=kernel_size,
@@ -433,7 +438,18 @@ def build_weight_shared_convolutional_keras_box_predictor(
       apply_conv_hyperparams_to_heads=apply_conv_hyperparams_to_heads,
       score_converter_fn=score_converter_fn,
       name='WeightSharedConvolutionalClassHead')
-  other_heads = {}
+  if embedding_size:
+    other_heads = {"embedding" : keras_embedding_head.WeightSharedConvolutionalEmbeddingHead(
+    embedding_size=embedding_size,
+    kernel_size=kernel_size,
+    use_depthwise=use_depthwise,
+    conv_hyperparams=conv_hyperparams,
+    apply_conv_hyperparams_to_heads=apply_conv_hyperparams_to_heads,
+    num_predictions_per_location=num_predictions_per_location,
+    name='WeightSharedConvolutionalEmbeddingHead')}
+  else:
+    other_heads = {}  
+  
 
   return (
       convolutional_keras_box_predictor.WeightSharedConvolutionalBoxPredictor(
@@ -935,6 +951,7 @@ def build_keras(hyperparams_fn, freeze_batchnorm, inplace_batchnorm_update,
         num_classes=num_classes,
         conv_hyperparams=conv_hyperparams,
         freeze_batchnorm=freeze_batchnorm,
+        embedding_size=config_box_predictor.embedding_size,
         inplace_batchnorm_update=inplace_batchnorm_update,
         num_predictions_per_location_list=num_predictions_per_location_list,
         depth=config_box_predictor.depth,

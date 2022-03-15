@@ -95,7 +95,7 @@ def _read_dataset_internal(file_read_func,
                        'still slightly shuffled since `num_readers` > 1.')
   if filename_shard_fn:
     filename_dataset = filename_shard_fn(filename_dataset)
-
+    
   filename_dataset = filename_dataset.repeat(config.num_epochs or None)
   records_dataset = filename_dataset.apply(
       tf.data.experimental.parallel_interleave(
@@ -248,6 +248,9 @@ def build(input_reader_config, batch_size=None, transform_input_data_fn=None,
       dataset = dataset.shard(input_reader_config.sample_1_of_n_examples, 0)
     # TODO(rathodv): make batch size a required argument once the old binaries
     # are deleted.
+    # Ibrahim Soliman (AUG) Here is the line where we duplicate input images to fill batch size augmentation
+    #if batch_size < 20:
+    dataset = dataset.interleave(lambda x: tf.data.Dataset.from_tensors(x).repeat(batch_size),cycle_length=1, block_length=1)
     dataset = dataset_map_fn(dataset, decoder.decode, batch_size,
                              input_reader_config)
     if reduce_to_frame_fn:
@@ -256,7 +259,7 @@ def build(input_reader_config, batch_size=None, transform_input_data_fn=None,
     if transform_input_data_fn is not None:
       dataset = dataset_map_fn(dataset, transform_input_data_fn,
                                batch_size, input_reader_config)
-    if batch_size:
+    if batch_size:  
       dataset = dataset.batch(batch_size,
                               drop_remainder=input_reader_config.drop_remainder)
     dataset = dataset.prefetch(input_reader_config.num_prefetch_batches)

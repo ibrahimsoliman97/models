@@ -30,6 +30,7 @@ import logging
 import os
 import io
 from tqdm import tqdm
+import shutil
 
 from lxml import etree
 import PIL.Image
@@ -133,6 +134,7 @@ def dict_to_tf_example(image_path,
 def main(_):
 
     data_dir = FLAGS.images_dir
+    data_new_dist = '/home/ubuntu/ibrahim/master/datasets/sub/train/'
 
     writer = tf.python_io.TFRecordWriter(FLAGS.output_path)
 
@@ -145,14 +147,22 @@ def main(_):
             logging.info('Parsing annotation %s.', annotation_xml)
             xml = ET.parse(annotation_xml)
             ignored_region = xml.find('ignored_region')
-            for image in tqdm(os.listdir(os.path.join(data_dir, directory))):
-                image_path = os.path.join(data_dir, directory, image)
-                frame_no = int(image.replace('img', '').replace('.jpg', ''))
-                target_list = xml.find(f".//*[@num='{frame_no}']")
-                annotations = target_list[0] if target_list else []
-                tf_example = dict_to_tf_example(
-                    image_path, annotations, label_map_dict, ignored_region, directory)
-                writer.write(tf_example.SerializeToString())
+            if not os.path.exists(os.path.join(data_new_dist, directory)):
+                os.makedirs(os.path.join(data_new_dist, directory))
+            c = 0
+            for image in tqdm(sorted(os.listdir(os.path.join(data_dir, directory)))):
+                if c>=5:
+                    image_path = os.path.join(data_dir, directory, image)
+                    dst_path = os.path.join(data_new_dist, directory, image)
+                    shutil.copyfile(image_path, dst_path)
+                    frame_no = int(image.replace('img', '').replace('.jpg', ''))
+                    target_list = xml.find(f".//*[@num='{frame_no}']")
+                    annotations = target_list[0] if target_list else []
+                    tf_example = dict_to_tf_example(
+                        dst_path, annotations, label_map_dict, ignored_region, directory)
+                    writer.write(tf_example.SerializeToString())
+                    c=0
+                c+=1
     writer.close()
 
 

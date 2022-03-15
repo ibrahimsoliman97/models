@@ -25,6 +25,7 @@ import time
 
 import numpy as np
 import tensorflow.compat.v1 as tf
+import tf_slim as slim
 
 from object_detection import eval_util
 from object_detection import inputs
@@ -210,6 +211,7 @@ def eager_train_step(detection_model,
                      labels,
                      unpad_groundtruth_tensors,
                      optimizer,
+                     train_config,
                      training_step,
                      add_regularization_loss=True,
                      clip_gradients_value=None,
@@ -312,8 +314,18 @@ def eager_train_step(detection_model,
 
     losses_dict = normalize_dict(losses_dict, num_replicas)
 
-  trainable_variables = detection_model.trainable_variables
-
+ # trainable_variables = detection_model.trainable_variables
+  include_variables = (
+      train_config.update_trainable_variables
+      if train_config.update_trainable_variables else None)
+  exclude_variables = (
+      train_config.freeze_variables
+      if train_config.freeze_variables else None)
+  trainable_variables = slim.filter_variables(
+      detection_model.trainable_variables,
+      include_patterns=include_variables,
+      exclude_patterns=exclude_variables)
+  #print(trainable_variables)
   total_loss = losses_dict['Loss/total_loss']
   gradients = tape.gradient(total_loss, trainable_variables)
 
@@ -404,7 +416,7 @@ def load_fine_tune_checkpoint(model, checkpoint_path, checkpoint_type,
   validate_tf_v2_checkpoint_restore_map(restore_from_objects_dict)
   ckpt = tf.train.Checkpoint(**restore_from_objects_dict)
   ckpt.restore(
-      checkpoint_path).expect_partial().assert_existing_objects_matched()
+      checkpoint_path).expect_partial()
 
 
 def get_filepath(strategy, filepath):
@@ -627,17 +639,20 @@ def train_loop(
           """Single train step."""
 
           if record_summaries:
+            imgs = features[fields.InputDataFields.image][:3]
+            imgs = tf.div(tf.subtract(imgs, tf.reduce_min(imgs)), tf.subtract(tf.reduce_max(imgs), tf.reduce_min(imgs)))
             tf.compat.v2.summary.image(
                 name='train_input_images',
                 step=global_step,
-                data=(features[fields.InputDataFields.image]  + 1) / 2,
-                max_outputs=3)
+                data=imgs,
+                max_outputs=4)
           losses_dict = eager_train_step(
               detection_model,
               features,
               labels,
               unpad_groundtruth_tensors,
               optimizer,
+              train_config,
               training_step=global_step,
               add_regularization_loss=add_regularization_loss,
               clip_gradients_value=clip_gradients_value,

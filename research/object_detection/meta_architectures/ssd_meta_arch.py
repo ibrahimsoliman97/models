@@ -981,14 +981,20 @@ class SSDMetaArch(model.DetectionModel):
       classification_loss = tf.multiply((self._classification_loss_weight /
                                          normalizer), classification_loss,
                                         name='classification_loss')
-
-      loss_dict = {
+      if self._embedding_loss:
+        embedding_loss = tf.multiply((self._embedding_weight /
+                                         normalizer), embedding_loss,
+                                        name='embedding_loss')
+        loss_dict = {
           'Loss/localization_loss': localization_loss,
           'Loss/classification_loss': classification_loss,
           'Loss/embedding_loss': embedding_loss
-      }
-
-
+        }
+      else:
+        loss_dict = {
+            'Loss/localization_loss': localization_loss,
+            'Loss/classification_loss': classification_loss,
+        }
     return loss_dict
 
   def _minibatch_subsample_fn(self, inputs):
